@@ -1,0 +1,383 @@
+---
+title: "Li Chiang, Delano - ECON3225 Project"
+output: pdf_document
+date: '2023-05-15'
+---
+
+**Load the required libraries**
+```{r}
+library(readxl)
+library(class)
+library(tree)
+library(keras)
+library(randomForest)
+library(dplyr)
+library(e1071)
+library(BART)
+library(ISLR)
+library(glmnet)
+library(tidyr)
+library(caret)
+library(MASS)
+library(gam)
+
+set.seed(1)
+```
+
+**Load data**
+```{r}
+train <- read_excel('./Qualitative Y - training_data.xlsx')
+test <- read_excel('./Qualitative Y - test_data.xlsx')
+
+dataset <- read_excel("./Qualitative Y - training_data.xlsx")
+dataset = na.omit(dataset)
+
+dataset_r <- read_excel("./Qualitative Y - test_data.xlsx")
+```
+
+**Clean data**
+```{r}
+train$Y <- as.factor(train$Y)
+train$X2 <- as.factor(train$X2)
+train$X4 <- as.factor(train$X4)
+train$X5 <- as.factor(train$X5)
+train$X6 <- as.factor(train$X6)
+train$X7 <- as.factor(train$X7)
+train$X8 <- as.factor(train$X8)
+train$X9 <- as.factor(train$X9)
+train$X10 <- as.factor(train$X10)
+train$X14 <- as.factor(train$X14)
+
+test$Y <- as.factor(test$Y)
+test$X2 <- as.factor(test$X2)
+test$X4 <- as.factor(test$X4)
+test$X5 <- as.factor(test$X5)
+test$X6 <- as.factor(test$X6)
+test$X7 <- as.factor(test$X7)
+test$X8 <- as.factor(test$X8)
+test$X9 <- as.factor(test$X9)
+test$X10 <- as.factor(test$X10)
+test$X14 <- as.factor(test$X14)
+
+
+
+set.seed(42)
+traindata = dataset %>%
+  sample_frac(0.9)
+
+testdata = dataset %>%
+  setdiff(traindata)
+
+head(traindata)
+
+X_train <- traindata[, !(names(traindata) %in% c("Y"))]
+y_train <- traindata$Y
+X_test <- testdata[, !(names(testdata) %in% c("Y"))]
+y_test <- testdata$Y
+x_whole_train <- dataset[, !(names(dataset) %in% c("Y"))]
+y_whole_train <- dataset$Y
+X_r <- dataset_r[, !(names(dataset_r) %in% c("Y"))]
+
+
+
+X_train[, c("X2","X4","X5", "X6", "X7", "X8", "X9", "X10", "X14")] <- lapply(X_train[, c("X2","X4","X5", "X6", "X7", "X8", "X9", "X10", "X14")], function(x) substr(x, 2, 2))
+
+X_test[, c("X2","X4", "X5", "X6","X7","X8", "X9", "X10", "X14")] <- lapply(X_test[, c("X2","X4", "X5", "X6", "X7", "X8", "X9", "X10", "X14")], function(x) substr(x, 2, 2))
+x_whole_train[, c("X2","X4", "X5", "X6","X7","X8", "X9", "X10", "X14")] <- lapply(x_whole_train[, c("X2","X4", "X5", "X6", "X7", "X8", "X9", "X10", "X14")], function(x) substr(x, 2, 2))
+X_r[, c("X2","X4", "X5", "X6","X7","X8","X9", "X10", "X14")] <- lapply(X_r[, c("X2","X4", "X5", "X6", "X7", "X8", "X9", "X10", "X14")], function(x) substr(x, 2, 2))
+
+X_train[, c("X2","X4", "X5", "X6", "X7", "X8","X9", "X10", "X14")] <- lapply(X_train[, c("X2","X4", "X5", "X6", "X7", "X8", "X9", "X10", "X14")], as.factor)
+
+X_test[, c("X2","X4", "X5", "X6", "X7", "X8","X9", "X10", "X14")] <- lapply(X_test[, c("X2","X4", "X5", "X6", "X7", "X8", "X9", "X10", "X14")], as.factor)
+
+x_whole_train[, c("X2","X4", "X5", "X6", "X7", "X8","X9", "X10", "X14")] <- lapply(x_whole_train[, c("X2","X4", "X5", "X6", "X7", "X8", "X9", "X10", "X14")], as.factor)
+
+X_r[, c("X2","X4", "X5", "X6", "X7", "X8", "X9", "X10", "X14")] <- lapply(X_r[, c("X2","X4", "X5", "X6", "X7", "X8", "X9", "X10", "X14")], as.factor)
+
+
+X_train_combined <- cbind(X_train[, c("X1", "X3","X11", "X12", "X13")], as.data.frame(sapply(X_train[, c("X2","X4", "X5", "X6", "X7", "X8", "X9", "X10", "X14")], as.integer)))
+X_test_combined <- cbind(X_test[, c("X1", "X3","X11", "X12", "X13")], as.data.frame(sapply(X_test[, c("X2","X4","X5", "X6", "X7", "X8", "X9", "X10", "X14")], as.integer)))
+x_whole_train_combined <- cbind(x_whole_train[, c("X1", "X3","X11", "X12", "X13")], as.data.frame(sapply(x_whole_train[, c("X2","X4","X5", "X6", "X7", "X8", "X9", "X10", "X14")], as.integer)))
+X_r_combined <- cbind(X_r[, c("X1", "X3", "X11", "X12", "X13")], as.data.frame(sapply(X_r[, c("X2","X4","X5", "X6", "X7", "X8", "X9", "X10", "X14")], as.integer)))
+
+set.seed(1)
+```
+
+**With logistic regression**
+```{r}
+glm.fit <- glm(Y ~ . -X5, data = train, family = binomial)
+summary(glm.fit)
+```
+
+Fitting the logistic model to the training data, we get
+```{r}
+glm.train.probs <- predict(glm.fit, type = 'response')
+glm.train.pred <- rep('C0', 29305)
+glm.train.pred[glm.train.probs > 0.5] = 'C1'
+table(glm.train.pred, train$Y)
+```
+Accuracy rate = (20795 + 4225) / 29305 = 85.38%
+
+```{r}
+glm.probs <- predict(glm.fit, test, type = 'response')
+glm.pred <- rep('1', 3256)
+glm.pred[glm.probs > 0.5] = '2'
+```
+
+**With KNN**
+```{r}
+knn.train.X <- train[, -15]
+knn.test.X <- test[, -15]
+knn.train.Y <- train$Y
+
+knn.train.X$X2 <- as.numeric(knn.train.X$X2)
+knn.train.X$X4 <- as.numeric(knn.train.X$X4)
+knn.train.X$X5 <- as.numeric(knn.train.X$X5)
+knn.train.X$X6 <- as.numeric(knn.train.X$X6)
+knn.train.X$X7 <- as.numeric(knn.train.X$X7)
+knn.train.X$X8 <- as.numeric(knn.train.X$X8)
+knn.train.X$X9 <- as.numeric(knn.train.X$X9)
+knn.train.X$X10 <- as.numeric(knn.train.X$X10)
+knn.train.X$X14 <- as.numeric(knn.train.X$X14)
+
+knn.test.X$X2 <- as.numeric(knn.test.X$X2)
+knn.test.X$X4 <- as.numeric(knn.test.X$X4)
+knn.test.X$X5 <- as.numeric(knn.test.X$X5)
+knn.test.X$X6 <- as.numeric(knn.test.X$X6)
+knn.test.X$X7 <- as.numeric(knn.test.X$X7)
+knn.test.X$X8 <- as.numeric(knn.test.X$X8)
+knn.test.X$X9 <- as.numeric(knn.test.X$X9)
+knn.test.X$X10 <- as.numeric(knn.test.X$X10)
+knn.test.X$X14 <- as.numeric(knn.test.X$X14)
+
+knn.pred <- knn(knn.train.X, knn.test.X, knn.train.Y, k = 1)
+```
+
+**With decision tree**
+```{r}
+tree.dec <- tree(Y ~ . - X14, train)
+cv.tree.dec <- cv.tree(tree.dec, FUN = prune.misclass)
+par(mfrow = c(1, 2))
+plot(cv.tree.dec$size , cv.tree.dec$dev, type = "b")
+plot(cv.tree.dec$k, cv.tree.dec$dev, type = "b")
+```
+We can see that tree of size 5 yields the best cross-validated error
+```{r}
+prune.tree <- prune.misclass(tree.dec , best = 5)
+tree.train.pred <- predict(prune.tree, type = 'class')
+table(tree.train.pred, train$Y)
+```
+Accuracy rate = (21190 + 3593) / 29305 = 84.57%
+
+```{r}
+tree.pred <- predict(prune.tree, test, type = 'class')
+```
+
+**With bagging**
+```{r}
+bag.train <- randomForest(Y~., data= train, importance = TRUE)
+bag.train
+test <- rbind(train[1,], test)
+test <- test[-1,]
+bag.pred <- predict(bag.train, newdata = test)
+```
+
+**With random forest**
+```{r}
+rf.train <- randomForest(Y~., data= train, mtry = 6, importance = TRUE)
+rf.pred <- predict(bag.train, newdata = test)
+```
+
+**With Lasso**
+```{r}
+set.seed(42)
+alphagrid <- 10^seq(-3,1,by=0.01)
+cv_model <- cv.glmnet(x = as.matrix(X_train_combined), 
+                      y=y_train, alpha=1, lambda= alphagrid, family= "binomial")
+best_alpha <- cv_model$lambda.min
+lasso_model <- glmnet(x = as.matrix(X_train_combined), 
+                      y = y_train, alpha = 1, lambda = best_alpha, family = "binomial")
+
+X_test_combined <- as.matrix(X_test_combined)
+y_pred <- predict(lasso_model, newx = X_test_combined, s = best_alpha, type = "class")
+accuracy <- mean(y_pred == y_test)
+print(paste("Accuracy:", accuracy))
+#"Accuracy: 0.796274141172449"
+
+alphagrid <- 10^seq(-3,1,by=0.01)
+cv_model <- cv.glmnet(x = as.matrix(x_whole_train_combined), 
+                      y= y_whole_train, alpha=1, lambda= alphagrid, family= "binomial")
+best_alpha <- cv_model$lambda.min
+lasso_model <- glmnet(x = as.matrix(x_whole_train_combined), 
+                      y= y_whole_train, alpha = 1, lambda = best_alpha, family = "binomial")
+
+
+y_pred_Lasso <- predict(lasso_model, newx = as.matrix(X_r_combined), s = best_alpha, type = "class")
+```
+
+**With RR**
+```{r}
+set.seed(1)
+cv_model <- cv.glmnet(x = as.matrix(X_train_combined), 
+                      y=y_train, alpha=0, lambda= alphagrid, family= "binomial")
+best_alpha <- cv_model$lambda.min
+RR_model <- glmnet(x = as.matrix(X_train_combined), 
+                   y = y_train, alpha = 0, lambda = best_alpha, family = "binomial")
+
+
+y_pred <- predict(RR_model, newx = X_test_combined, s = best_alpha, type = "class")
+accuracy <- mean(y_pred == y_test)
+print(paste("Accuracy:", accuracy))
+#"Accuracy: 0.79559049735088"
+
+cv_model <- cv.glmnet(x = as.matrix(x_whole_train_combined), 
+                      y=y_whole_train, alpha=0, lambda= alphagrid, family= "binomial")
+best_alpha <- cv_model$lambda.min
+RR_model <- glmnet(x = as.matrix(x_whole_train_combined), 
+                   y = y_whole_train, alpha = 0, lambda = best_alpha, family = "binomial")
+y_pred_RR <- predict(RR_model, newx = as.matrix(X_r_combined), s = best_alpha, type = "class")
+```
+
+**With N.B.**
+```{r}
+nb_model <- naiveBayes(x = X_train_combined, y = y_train)
+
+y_pred <- predict(nb_model, newdata = X_test_combined)
+
+accuracy <- mean(y_pred == y_test)
+print(paste("Accuracy:", accuracy))
+#"Accuracy: 0.790292257733721"
+
+nb_model <- naiveBayes(x = x_whole_train_combined, y = y_whole_train)
+y_pred_nb <- as.matrix(predict(nb_model, newdata = X_r_combined))
+```
+
+**With LDA**
+```{r}
+qualitative_cols <- c("X2", "X4", "X5", "X6", "X7", "X8", "X9", "X10", "X14")
+traindata[, qualitative_cols] <- lapply(traindata[, qualitative_cols], function(x) substr(as.character(x), 2, 2))
+testdata[, qualitative_cols] <- lapply(testdata[, qualitative_cols], function(x) substr(as.character(x), 2, 2))
+traindata[qualitative_cols] <- lapply(traindata[qualitative_cols], as.factor)
+testdata[qualitative_cols] <- lapply(testdata[qualitative_cols], as.factor)
+dataset[, qualitative_cols] <- lapply(dataset[, qualitative_cols], function(x) substr(as.character(x), 2, 2))
+dataset[qualitative_cols] <- lapply(dataset[qualitative_cols], as.factor)
+dataset_r[, qualitative_cols] <- lapply(dataset_r[, qualitative_cols], function(x) substr(as.character(x), 2, 2))
+dataset_r[qualitative_cols] <- lapply(dataset_r[qualitative_cols], as.factor)
+
+X_train <- traindata[, c("X1", "X3", "X11", "X12", "X13")]
+y_train <- as.factor(substr(as.character(traindata$Y), 2, 2))
+X_test <- testdata[, c("X1", "X3", "X11", "X12", "X13")]
+y_test <- substr(as.character(testdata$Y), 2, 2)
+x_whole_train <-dataset[, c("X1", "X3", "X11", "X12", "X13")]
+y_whole_train <- as.factor(substr(as.character(dataset$Y), 2, 2))
+
+X_r <- dataset_r[, c("X1", "X3", "X11", "X12", "X13")]
+
+
+lda_model <- lda(x = X_train, grouping = y_train)
+y_pred <- predict(lda_model, newdata = X_test)$class
+accuracy <- mean(y_pred == y_test)
+print(paste("Accuracy:", accuracy))
+#"Accuracy: 0.771833874551359"
+
+lda_model <- lda(x = x_whole_train, grouping = y_whole_train)
+
+y_pred_lda <- as.matrix(paste0("C",as.character(predict(lda_model, newdata = X_r)$class)))
+```
+
+**With QDA**
+```{r}
+qda_model <- qda(x = X_train, grouping = y_train)
+y_pred <- predict(qda_model, newdata = X_test)$class
+accuracy <- mean(y_pred == y_test)
+print(paste("Accuracy:", accuracy))
+#"Accuracy: 0.78943770295676"
+
+qda_model <- qda(x = x_whole_train, grouping = y_whole_train)
+y_pred_qda <- as.matrix(paste0("C",as.character(predict(qda_model, newdata = X_r)$class)))
+
+```
+
+**With SVM**; SVM was done in Python (please do see the separate .py file)
+```{r}
+svm <- read.csv("SVM1.csv")
+svm <- svm[,2]
+```
+
+**With GAM**
+```{r}
+dataset <- read_excel("./Qualitative Y - training_data.xlsx")
+dataset = na.omit(dataset)
+
+dataset_r <- read_excel("./Qualitative Y - test_data.xlsx")
+
+data <- data.frame(X1 = dataset$X1, X3 = dataset$X3, X11 = dataset$X11, X12 = dataset$X12, X13 = dataset$X13, 
+                   X2 = as.factor(substr(dataset$X2, 2, 2)), 
+                   X4 = as.factor(substr(dataset$X4, 2, 2)), 
+                   X5 = as.factor(substr(dataset$X5, 2, 2)), 
+                   X6 = as.factor(substr(dataset$X6, 2, 2)), 
+                   X7 = as.factor(substr(dataset$X7, 2, 2)), 
+                   X8 = as.factor(substr(dataset$X8, 2, 2)), 
+                   X9 = as.factor(substr(dataset$X9, 2, 2)), 
+                   X10 = as.factor(substr(dataset$X10, 2, 2)), 
+                   X14 = as.factor(substr(dataset$X14, 2, 2)), 
+                   Y =  as.factor(substr(dataset$Y, 2, 2)))
+gam_model <- gam(Y ~ s(X1) + s(X3) + s(X11) + s(X12) + s(X13) 
+                 + factor(X2) + factor(X4) + factor(X5) + factor(X6) 
+                 + factor(X7) + factor(X8) + factor(X9) + factor(X10) + factor(X14), data = data, family = binomial())
+predicted_classes <- ifelse(predict(gam_model, newdata = data, type = "response") >= 0.5, 1, 0)
+accuracy <- sum(predicted_classes == data$Y) / nrow(data)
+print(paste("Accuracy:", accuracy))
+#Accuracy: 0.859375533185463"
+
+
+data_r <- data.frame(X1 = dataset_r$X1, X3 = dataset_r$X3, X11 = dataset_r$X11, X12 = dataset_r$X12, 
+                     X13 = dataset_r$X13, 
+                     X2 = as.factor(substr(dataset_r$X2, 2, 2)), 
+                     X4 = as.factor(substr(dataset_r$X4, 2, 2)), 
+                     X5 = as.factor(substr(dataset_r$X5, 2, 2)), 
+                     X6 = as.factor(substr(dataset_r$X6, 2, 2)), 
+                     X7 = as.factor(substr(dataset_r$X7, 2, 2)), 
+                     X8 = as.factor(substr(dataset_r$X8, 2, 2)), 
+                     X9 = as.factor(substr(dataset_r$X9, 2, 2)), 
+                     X10 = as.factor(substr(dataset_r$X10, 2, 2)), 
+                     X14 = as.factor(substr(dataset_r$X14, 2, 2)))
+
+
+y_pred_gam <- ifelse(predict(gam_model, newdata = data_r, type = "response") >= 0.5, 1, 0)
+```
+
+**Combine predictions with ensemble method (hard vote)**
+```{r}
+glm.pred <- c(glm.pred)
+knn.pred <- c(knn.pred)
+tree.pred <- c(tree.pred)
+bag.pred <- c(bag.pred)
+rf.pred <- c(rf.pred)
+y_pred_Lasso <- c(y_pred_Lasso)
+y_pred_RR <- c(y_pred_RR)
+y_pred_nb <- c(y_pred_nb)
+y_pred_lda <- c(y_pred_lda)
+y_pred_qda <- c(y_pred_qda)
+y_pred_gam <- c(y_pred_gam)
+svm <- c(svm)
+
+ensemble <- data.frame(cbind(glm.pred, glm.pred, knn.pred, tree.pred, tree.pred, bag.pred, bag.pred, bag.pred, rf.pred, rf.pred, rf.pred, y_pred_Lasso, y_pred_RR, y_pred_nb, y_pred_lda, y_pred_qda, svm, y_pred_gam, y_pred_gam, y_pred_gam))
+ensemble["y_pred_Lasso"][ensemble["y_pred_Lasso"]=="C0"] <- 1
+ensemble["y_pred_Lasso"][ensemble["y_pred_Lasso"]=="C1"] <- 2
+ensemble["y_pred_RR"][ensemble["y_pred_RR"]=="C0"] <- 1
+ensemble["y_pred_RR"][ensemble["y_pred_RR"]=="C1"] <- 2
+ensemble["y_pred_qda"][ensemble["y_pred_qda"]=="C0"] <- 1
+ensemble["y_pred_qda"][ensemble["y_pred_qda"]=="C1"] <- 2
+ensemble["svm"][ensemble["svm"]==1] <- 2
+ensemble["svm"][ensemble["svm"]==0] <- 1
+ensemble["y_pred_gam"][ensemble["y_pred_gam"]==1] <- 2
+ensemble["y_pred_gam"][ensemble["y_pred_gam"]==0] <- 1
+
+ensemble2 <- apply(ensemble, 1, function(x) names(which.max(table(x))))
+ensemble2[ensemble2==1] <- "C0"
+ensemble2[ensemble2==2] <- "C1"
+
+ensemble2 <- cbind(test[, -15], ensemble2)
+write.csv(ensemble2, './Chiang, Delano, Li - Project Result.csv', row.names = FALSE)
+```
